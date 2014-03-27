@@ -20,13 +20,16 @@
 #include "device.h"
 #include "screen_ui.h"
 
-static const char* HEADERS[] = { "Volume up/down to move highlight;",
-                                 "enter button to select.",
+static const char* HEADERS[] = { "K1: Highlight up",
+                                 "K2: Highlight down",
+                                 "K3: Highlight select",
+                                 "K4: toggle display",
                                  "",
                                  NULL };
 
 static const char* ITEMS[] =  {"reboot system now",
                                "apply update from ADB",
+                               "apply update from external storage",
                                "wipe data/factory reset",
                                "wipe cache partition",
                                NULL };
@@ -34,7 +37,7 @@ static const char* ITEMS[] =  {"reboot system now",
 class DefaultUI : public ScreenRecoveryUI {
   public:
     virtual KeyAction CheckKey(int key) {
-        if (key == KEY_HOME) {
+        if (key == KEY_POWER) {
             return TOGGLE;
         }
         return ENQUEUE;
@@ -53,14 +56,17 @@ class DefaultDevice : public Device {
         if (visible) {
             switch (key) {
               case KEY_DOWN:
+              case KEY_HOME:
               case KEY_VOLUMEDOWN:
                 return kHighlightDown;
 
               case KEY_UP:
+              case KEY_BACK:
               case KEY_VOLUMEUP:
                 return kHighlightUp;
 
               case KEY_ENTER:
+              case KEY_MENU:
                 return kInvokeItem;
             }
         }
@@ -72,8 +78,9 @@ class DefaultDevice : public Device {
         switch (menu_position) {
           case 0: return REBOOT;
           case 1: return APPLY_ADB_SIDELOAD;
-          case 2: return WIPE_DATA;
-          case 3: return WIPE_CACHE;
+          case 2: return APPLY_EXT;
+          case 3: return WIPE_DATA;
+          case 4: return WIPE_CACHE;
           default: return NO_ACTION;
         }
     }

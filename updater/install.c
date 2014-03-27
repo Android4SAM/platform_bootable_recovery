@@ -96,7 +96,7 @@ Value* MountFn(const char* name, State* state, int argc, Expr* argv[]) {
     }
 #endif
 
-    if (strcmp(partition_type, "MTD") == 0) {
+    if ((strcmp(partition_type, "MTD") == 0) && (strcmp(fs_type, "ubifs") != 0)) {
         mtd_scan_partitions();
         const MtdPartition* mtd;
         mtd = mtd_find_partition_by_name(location);
@@ -1125,6 +1125,29 @@ Value* ReadFileFn(const char* name, State* state, int argc, Expr* argv[]) {
     return v;
 }
 
+Value* ChooseDtbFileAutoFn(const char* name, State* state, int argc, Expr* argv[]) {
+    char* result = NULL;
+    int variant_id;
+    char board_suffix[16];
+    char dtbFile[32];
+    FILE* fp;
+
+    fp = fopen("/proc/device-tree/model", "r");
+    fscanf(fp, "Atmel SAMA5D3%d-%s", &variant_id, board_suffix);
+
+    if (strcmp(board_suffix, "EK") == 0) {
+        sprintf(dtbFile, "sama5d3%dek.dtb", variant_id);
+        fprintf(stderr, "%s: Choose the corresponding dtb file %s\n", name, dtbFile);
+        result = dtbFile;
+    } else if (strcmp(board_suffix, "EK_PDA") == 0) {
+        sprintf(dtbFile, "sama5d3%dek_pda.dtb", variant_id);
+        fprintf(stderr, "%s: Choose the corresponding dtb file %s\n", name, dtbFile);
+        result = dtbFile;
+    }
+
+    return StringValue(strdup(result));
+}
+
 void RegisterInstallFunctions() {
     RegisterFunction("mount", MountFn);
     RegisterFunction("is_mounted", IsMountedFn);
@@ -1143,6 +1166,7 @@ void RegisterInstallFunctions() {
     RegisterFunction("getprop", GetPropFn);
     RegisterFunction("file_getprop", FileGetPropFn);
     RegisterFunction("write_raw_image", WriteRawImageFn);
+    RegisterFunction("choose_dtb_file_auto", ChooseDtbFileAutoFn);
 
     RegisterFunction("apply_patch", ApplyPatchFn);
     RegisterFunction("apply_patch_check", ApplyPatchCheckFn);

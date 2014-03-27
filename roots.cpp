@@ -177,6 +177,7 @@ int ensure_path_mounted(const char* path) {
         }
         return mtd_mount_partition(partition, v->mount_point, v->fs_type, 0);
     } else if (strcmp(v->fs_type, "ext4") == 0 ||
+               strcmp(v->fs_type, "ubifs") == 0 ||
                strcmp(v->fs_type, "vfat") == 0) {
         result = mount(v->device, v->mount_point, v->fs_type,
                        MS_NOATIME | MS_NODEV | MS_NODIRATIME, "");
@@ -226,6 +227,41 @@ int ensure_path_unmounted(const char* path) {
     return unmount_mounted_volume(mv);
 }
 
+int write_ubi_image(MtdWriteContext *ctx, const char* filename)
+{
+    FILE* f = fopen(filename, "rb");
+
+    if (f == NULL) {
+        fprintf(stderr, "write_ubi_image: can't open %s: %s\n",
+                filename, strerror(errno));
+        return -1;
+    }
+
+    char* buffer = (char*)malloc(BUFSIZ);
+    int read;
+    bool success = true;
+    while (success && (read = fread(buffer, 1, BUFSIZ, f)) > 0) {
+        int wrote = mtd_write_data(ctx, buffer, read);
+        success = success && (wrote == read);
+    }
+    free(buffer);
+    fclose(f);
+
+    if (!success) {
+        fprintf(stderr, "mtd_write_data failed: %s\n",
+                strerror(errno));
+    }
+
+    if (mtd_erase_blocks(ctx, -1) == -1) {
+        fprintf(stderr, "write_ubi_image: error erasing blocks\n");
+    }
+
+    printf("%s partition\n",
+           success ? "wrote" : "failed to write");
+
+    return 0;
+}
+
 int format_volume(const char* volume) {
     Volume* v = volume_for_path(volume);
     if (v == NULL) {
@@ -267,6 +303,40 @@ int format_volume(const char* volume) {
             LOGW("format_volume: can't close MTD \"%s\"\n", v->device);
             return -1;
         }
+        return 0;
+    }
+
+    if (strcmp(v->fs_type, "ubifs") == 0) {
+        char image_file[64];
+        if (strcmp(volume, "/data") == 0) {
+            strcpy(image_file, "/userdata.img");
+        } else {
+            return -1;
+        }
+
+        mtd_scan_partitions();
+        const MtdPartition* partition = mtd_find_partition_by_ubi_volume(v->device);
+        if (partition == NULL) {
+            LOGE("format_volume: no MTD partition \"%s\"\n", v->device);
+            return -1;
+        }
+
+        MtdWriteContext *write = mtd_write_partition(partition);
+        if (write == NULL) {
+            LOGW("format_volume: can't open MTD \"%s\"\n", v->device);
+            return -1;
+        } else if (mtd_erase_blocks(write, -1) == (off_t) -1) {
+            LOGW("format_volume: can't erase MTD \"%s\"\n", v->device);
+            mtd_write_close(write);
+            return -1;
+        } else if (write_ubi_image(write, image_file) == -1) {
+            LOGW("format_volume: can't write MTD \"%s\"\n", v->device);
+            return -1;
+        } else if (mtd_write_close(write)) {
+            LOGW("format_volume: can't close MTD \"%s\"\n", v->device);
+            return -1;
+        }
+
         return 0;
     }
 

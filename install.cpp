@@ -288,7 +288,7 @@ really_install_package(const char *path, int* wipe_cache)
     }
 
     ui->Print("Opening update package...\n");
-
+/*
     int numKeys;
     RSAPublicKey* loadedKeys = load_keys(PUBLIC_KEYS_FILE, &numKeys);
     if (loadedKeys == NULL) {
@@ -310,9 +310,10 @@ really_install_package(const char *path, int* wipe_cache)
         LOGE("signature verification failed\n");
         return INSTALL_CORRUPT;
     }
-
+*/
     /* Try to open the package.
      */
+    int err;
     ZipArchive zip;
     err = mzOpenZipArchive(path, &zip);
     if (err != 0) {

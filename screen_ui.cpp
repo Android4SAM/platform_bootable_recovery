@@ -335,6 +335,7 @@ void ScreenRecoveryUI::Init()
     text_cols = gr_fb_width() / CHAR_WIDTH;
     if (text_cols > kMaxCols - 1) text_cols = kMaxCols - 1;
 
+    backgroundIcon[NONE] = NULL;
     LoadBitmap("icon_installing", &backgroundIcon[INSTALLING_UPDATE]);
     backgroundIcon[ERASING] = backgroundIcon[INSTALLING_UPDATE];
     LoadBitmap("icon_error", &backgroundIcon[ERROR]);
