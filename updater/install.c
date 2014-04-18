@@ -42,6 +42,8 @@
 #include "make_ext4fs.h"
 #endif
 
+int dd_main(int, char**);
+
 // mount(fs_type, partition_type, location, mount_point)
 //
 //    fs_type="yaffs2" partition_type="MTD"     location=partition
@@ -819,6 +821,46 @@ done:
     return StringValue(result);
 }
 
+// write_ext4_image(filename_or_blob, device)
+Value* WriteExt4ImageFn(const char* name, State* state, int argc, Expr* argv[]) {
+    char* result = NULL;
+    if (argc != 2) {
+        return ErrorAbort(state, "%s() expects 2 args, got %d", name, argc);
+    }
+    char* image_name;
+    char* device;
+    if (ReadArgs(state, argv, 2, &image_name, &device) < 0) {
+        return NULL;
+    }
+
+    if (strlen(image_name) == 0) {
+        ErrorAbort(state, "image_name argument to %s() can't be empty", name);
+        goto done;
+    }
+    if (strlen(device) == 0) {
+        ErrorAbort(state, "device argument to %s() can't be empty",
+                   name);
+        goto done;
+    }
+
+    char infile[64];
+    char outfile[64];
+    char bs[] = "bs=4096";
+    sprintf(infile, "if=%s", image_name);
+    sprintf(outfile, "of=%s", device);
+
+    char *dd_argv[5];
+    dd_argv[4] = NULL;
+    dd_argv[1] = infile;
+    dd_argv[2] = outfile;
+    dd_argv[3] = bs;
+    dd_main(4, dd_argv);
+done:
+    free(image_name);
+    free(device);
+    return StringValue(result);
+}
+
 // apply_patch_space(bytes)
 Value* ApplyPatchSpaceFn(const char* name, State* state,
                          int argc, Expr* argv[]) {
@@ -1166,6 +1208,7 @@ void RegisterInstallFunctions() {
     RegisterFunction("getprop", GetPropFn);
     RegisterFunction("file_getprop", FileGetPropFn);
     RegisterFunction("write_raw_image", WriteRawImageFn);
+    RegisterFunction("write_ext4_image", WriteExt4ImageFn);
     RegisterFunction("choose_dtb_file_auto", ChooseDtbFileAutoFn);
 
     RegisterFunction("apply_patch", ApplyPatchFn);
