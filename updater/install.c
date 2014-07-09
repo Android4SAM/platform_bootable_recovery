@@ -1419,6 +1419,35 @@ Value* ReadFileFn(const char* name, State* state, int argc, Expr* argv[]) {
     return v;
 }
 
+Value* ChooseDtbFileAutoFn(const char* name, State* state, int argc, Expr* argv[]) {
+    char* result = NULL;
+    FILE* fp;
+    char modelsuffix[32];
+    char filename[32];
+    char *tmp = NULL;
+    char *str = NULL;
+
+    fp = fopen("/proc/device-tree/model", "r");
+    fscanf(fp, "Atmel %s", modelsuffix);
+
+    tmp = filename;
+    str = modelsuffix;
+    while(*str != '\0') {
+        if (*str == '-') {
+            str++;
+            continue;
+        }
+        *tmp = tolower(*str);
+        str++;
+        tmp++;
+    }
+    *tmp = '\0';
+    sprintf(filename, "%s.dtb", filename);
+    result = filename;
+
+    return StringValue(strdup(result));
+}
+
 void RegisterInstallFunctions() {
     RegisterFunction("mount", MountFn);
     RegisterFunction("is_mounted", IsMountedFn);
@@ -1452,6 +1481,7 @@ void RegisterInstallFunctions() {
     RegisterFunction("getprop", GetPropFn);
     RegisterFunction("file_getprop", FileGetPropFn);
     RegisterFunction("write_raw_image", WriteRawImageFn);
+    RegisterFunction("choose_dtb_file_auto", ChooseDtbFileAutoFn);
 
     RegisterFunction("apply_patch", ApplyPatchFn);
     RegisterFunction("apply_patch_check", ApplyPatchCheckFn);
