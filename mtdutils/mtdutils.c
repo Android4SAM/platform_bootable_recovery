@@ -189,6 +189,32 @@ mtd_find_partition_by_name(const char *name)
     return NULL;
 }
 
+const MtdPartition *
+mtd_find_partition_by_ubi_volume(const char *name)
+{
+    int mtdnum;
+    int dev_id;
+    int vol_id;
+    char file_name[64];
+    FILE* fp;
+
+    sscanf(name, "ubi%d_%d", &dev_id, &vol_id);
+
+    sprintf(file_name, "/sys/class/ubi/ubi%d/mtd_num", dev_id);
+
+    fp = fopen(file_name, "r");
+
+    fscanf(fp, "%d", &mtdnum);
+
+    fclose(fp);
+
+    if (g_mtd_state.partitions != NULL) {
+        MtdPartition *p = &g_mtd_state.partitions[mtdnum];
+        return p;
+    }
+    return NULL;
+}
+
 int
 mtd_mount_partition(const MtdPartition *partition, const char *mount_point,
         const char *filesystem, int read_only)
@@ -404,6 +430,44 @@ static void add_bad_block_offset(MtdWriteContext *ctx, off_t pos) {
     ctx->bad_block_offsets[ctx->bad_block_count++] = pos;
 }
 
+static ssize_t mtd_get_page_size(const MtdWriteContext *ctx)
+{
+    const MtdPartition *partition = ctx->partition;
+    char file_name[64];
+    FILE* fp;
+    int page_size;
+
+    sprintf(file_name, "/sys/class/mtd/mtd%d/writesize", partition->device_index);
+
+    fp = fopen(file_name, "r");
+
+    fscanf(fp, "%d", &page_size);
+
+    fclose(fp);
+
+    return (ssize_t)page_size;
+}
+
+static ssize_t drop_ffs(const MtdWriteContext *ctx, const char *buf, const ssize_t *len)
+{
+    ssize_t l = *len;
+    ssize_t page_size;
+    ssize_t i;
+
+    page_size = mtd_get_page_size(ctx);
+
+    for (i = l - 1; i >= 0; i--)
+        if (buf[i] != 0xFF)
+            break;
+
+    /* The resulting length must be aligned to the minimum flash I/O size */
+    l = i + 1;
+    l = (l + page_size - 1) / page_size;
+    l *= page_size;
+
+    return l;
+}
+
 static int write_block(MtdWriteContext *ctx, const char *data)
 {
     const MtdPartition *partition = ctx->partition;
@@ -412,14 +476,16 @@ static int write_block(MtdWriteContext *ctx, const char *data)
     off_t pos = lseek(fd, 0, SEEK_CUR);
     if (pos == (off_t) -1) return 1;
 
+    off_t next_pos;
+
     ssize_t size = partition->erase_size;
+    ssize_t truncated_size = drop_ffs(ctx, data, &size);
     while (pos + size <= (int) partition->size) {
         loff_t bpos = pos;
         int ret = ioctl(fd, MEMGETBADBLOCK, &bpos);
         if (ret != 0 && !(ret == -1 && errno == EOPNOTSUPP)) {
             add_bad_block_offset(ctx, pos);
-            fprintf(stderr,
-                    "mtd: not writing bad block at 0x%08lx (ret %d errno %d)\n",
+            printf("mtd: not writing bad block at 0x%08lx (ret %d errno %d)\n",
                     pos, ret, errno);
             pos += partition->erase_size;
             continue;  // Don't try to erase known factory-bad blocks.
@@ -436,19 +502,19 @@ static int write_block(MtdWriteContext *ctx, const char *data)
                 continue;
             }
             if (lseek(fd, pos, SEEK_SET) != pos ||
-                write(fd, data, size) != size) {
+                write(fd, data, truncated_size) != truncated_size) {
                 printf("mtd: write error at 0x%08lx (%s)\n",
                         pos, strerror(errno));
             }
 
-            char verify[size];
+            char verify[truncated_size];
             if (lseek(fd, pos, SEEK_SET) != pos ||
-                read(fd, verify, size) != size) {
+                read(fd, verify, truncated_size) != truncated_size) {
                 printf("mtd: re-read error at 0x%08lx (%s)\n",
                         pos, strerror(errno));
                 continue;
             }
-            if (memcmp(data, verify, size) != 0) {
+            if (memcmp(data, verify, truncated_size) != 0) {
                 printf("mtd: verification error at 0x%08lx (%s)\n",
                         pos, strerror(errno));
                 continue;
@@ -457,6 +523,13 @@ static int write_block(MtdWriteContext *ctx, const char *data)
             if (retry > 0) {
                 printf("mtd: wrote block after %d retries\n", retry);
             }
+
+            next_pos = pos + partition->erase_size;
+            if (lseek(fd, next_pos, SEEK_SET) != next_pos) {
+                fprintf(stderr, "mtd: set position error at 0x%08lx (%s)\n",
+                        next_pos, strerror(errno));
+            }
+            next_pos = lseek(fd, 0, SEEK_CUR);
             printf("mtd: successfully wrote block at %lx\n", pos);
             return 0;  // Success!
         }
