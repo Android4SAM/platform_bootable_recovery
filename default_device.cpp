@@ -29,6 +29,7 @@ static const char* HEADERS[] = { "K1: Highlight up",
 
 static const char* ITEMS[] =  {"reboot system now",
                                "apply update from ADB",
+                               "apply update from external storage",
                                "wipe data/factory reset",
                                "wipe cache partition",
                                NULL };
@@ -77,8 +78,9 @@ class DefaultDevice : public Device {
         switch (menu_position) {
           case 0: return REBOOT;
           case 1: return APPLY_ADB_SIDELOAD;
-          case 2: return WIPE_DATA;
-          case 3: return WIPE_CACHE;
+          case 2: return APPLY_EXT;
+          case 3: return WIPE_DATA;
+          case 4: return WIPE_CACHE;
           default: return NO_ACTION;
         }
     }
