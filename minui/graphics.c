@@ -153,6 +153,13 @@ static int get_framebuffer(GGLSurface *fb)
 
     double_buffering = 1;
 
+    vi.yres_virtual = vi.yres * NUM_BUFFERS;
+    if (ioctl(fd, FBIOPUT_VSCREENINFO, &vi) < 0) {
+        perror("failed to put fb0 info");
+        close(fd);
+        return -1;
+    }
+
     fb->version = sizeof(*fb);
     fb->width = vi.xres;
     fb->height = vi.yres;
@@ -176,10 +183,10 @@ static void get_memory_surface(GGLSurface* ms) {
 static void set_active_framebuffer(unsigned n)
 {
     if (n > 1 || !double_buffering) return;
-    vi.yres_virtual = vi.yres * NUM_BUFFERS;
+
     vi.yoffset = n * vi.yres;
     vi.bits_per_pixel = PIXEL_SIZE * 8;
-    if (ioctl(gr_fb_fd, FBIOPUT_VSCREENINFO, &vi) < 0) {
+    if (ioctl(gr_fb_fd, FBIOPAN_DISPLAY, &vi) < 0) {
         perror("active fb swap failed");
     }
 }
