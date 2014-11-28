@@ -41,6 +41,8 @@ int get_bootloader_message(struct bootloader_message *out) {
         return get_bootloader_message_mtd(out, v);
     } else if (strcmp(v->fs_type, "emmc") == 0) {
         return get_bootloader_message_block(out, v);
+    } else if (strcmp(v->fs_type, "ramdisk") == 0) {
+        return 0;
     }
     LOGE("unknown misc partition fs_type \"%s\"\n", v->fs_type);
     return -1;
@@ -56,6 +58,8 @@ int set_bootloader_message(const struct bootloader_message *in) {
         return set_bootloader_message_mtd(in, v);
     } else if (strcmp(v->fs_type, "emmc") == 0) {
         return set_bootloader_message_block(in, v);
+    } else if (strcmp(v->fs_type, "ramdisk") == 0) {
+        return 0;
     }
     LOGE("unknown misc partition fs_type \"%s\"\n", v->fs_type);
     return -1;

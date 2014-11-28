@@ -282,7 +282,8 @@ int setup_install_mounts() {
         Volume* v = fstab->recs + i;
 
         if (strcmp(v->mount_point, "/tmp") == 0 ||
-            strcmp(v->mount_point, "/cache") == 0) {
+            strcmp(v->mount_point, "/cache") == 0 ||
+            (strcmp(v->mount_point, "/misc")  == 0 && strcmp(v->fs_type, "ramdisk") == 0)) {
             if (ensure_path_mounted(v->mount_point) != 0) return -1;
 
         } else {

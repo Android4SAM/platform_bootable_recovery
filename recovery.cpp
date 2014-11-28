@@ -763,7 +763,6 @@ wipe_data(int confirm, Device* device) {
     ui->Print("\n-- Wiping data...\n");
     device->WipeData();
     erase_volume("/data");
-    erase_volume("/cache");
     ui->Print("Data wipe complete.\n");
 }
 
@@ -954,7 +953,7 @@ main(int argc, char **argv) {
         case 'p': previous_runs = atoi(optarg); break;
         case 's': send_intent = optarg; break;
         case 'u': update_package = optarg; break;
-        case 'w': wipe_data = wipe_cache = 1; break;
+        case 'w': wipe_data = 1; break;
         case 'c': wipe_cache = 1; break;
         case 't': show_text = 1; break;
         case 'x': just_exit = true; break;
