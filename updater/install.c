@@ -1464,27 +1464,68 @@ Value* ReadFileFn(const char* name, State* state, int argc, Expr* argv[]) {
 Value* ChooseDtbFileAutoFn(const char* name, State* state, int argc, Expr* argv[]) {
     char* result = NULL;
     FILE* fp;
-    char modelsuffix[32];
-    char filename[32];
-    char *tmp = NULL;
-    char *str = NULL;
+    char model[64];
+    char filename[64];
+    int is_xplained, is_d4, is_pda;
+    int subid, pda_size;
+    char ch;
 
     fp = fopen("/proc/device-tree/model", "r");
-    fscanf(fp, "Atmel %s", modelsuffix);
+    fgets(model, 64, fp);
+    printf("%s\n", model);
 
-    tmp = filename;
-    str = modelsuffix;
-    while(*str != '\0') {
-        if (*str == '-') {
-            str++;
-            continue;
-        }
-        *tmp = tolower(*str);
-        str++;
-        tmp++;
+    if(strstr(model, "Xplained")) {
+        is_xplained = 1;
+    } else {
+        is_xplained = 0;
     }
-    *tmp = '\0';
-    sprintf(filename, "%s.dtb", filename);
+
+    if(strstr(model, "SAMA5D4")) {
+        is_d4 = 1;
+    } else {
+        is_d4 = 0;
+        ch = model[13];
+        subid = ch - '0';
+    }
+
+    if(strstr(model, "TM43xx")) {
+        is_pda = 1;
+        pda_size = 4;
+    } else if(strstr(model, "TM70xx")) {
+        is_pda = 1;
+        pda_size = 7;
+    } else {
+        is_pda = 0;
+    }
+
+    if(!is_xplained) {
+        if(is_d4) {
+            sprintf(filename, "sama5d4ek.dtb");
+        } else {
+            if(!is_pda) {
+                sprintf(filename, "sama5d3%dek.dtb", subid);
+            } else {
+                sprintf(filename, "sama5d3%dek_pda%d.dtb", subid, pda_size);
+            }
+        }
+    } else {
+        if(is_d4) {
+            if(!is_pda) {
+                sprintf(filename, "at91-sama5d4_xplained.dtb");
+            } else {
+                sprintf(filename, "at91-sama5d4_xplained_pda%d.dtb", pda_size);
+            }
+        } else {
+            if(!is_pda) {
+                sprintf(filename, "at91-sama5d3_xplained.dtb");
+            } else {
+                sprintf(filename, "at91-sama5d3_xplained_pda%d.dtb", pda_size);
+            }
+        }
+    }
+    printf("%s\n", filename);
+    fclose(fp);
+
     result = filename;
 
     return StringValue(strdup(result));
